@@ -2,7 +2,7 @@ import os
 import requests
 import json
 from dotenv import load_dotenv
-from tools import TOOLS, TOOL_MAP
+from tools import TOOLS, TOOL_MAP, read_file, write_file, run_command, apply_patch
 
 load_dotenv()
 
@@ -26,14 +26,24 @@ def call_gemini(prompt, history=None):
             "tools": TOOLS,
             "system_instruction": {"parts": [{"text": system_instruction}]}
         }
+        print("\n--- PAYLOAD ---")
+        print(json.dumps(payload, indent=2))
+        print("---------------\n")
         
         response = requests.post(URL, headers=headers, json=payload)
         
+        print("\n--- RESPONSE ---")
+        print(json.dumps(response.json(), indent=2))
+        print("----------------\n")
         if response.status_code != 200:
             return f"Error: {response.status_code} - {response.text}", history
 
         data = response.json()
         candidate = data['candidates'][0]
+        metadata = data['usageMetadata']
+        print(f"Prompt_Tokens: {metadata["promptTokenCount"]}")
+        print(f"Output_Tokens: {metadata["candidatesTokenCount"]}")
+        print(f"Total_Tokens:  {metadata["totalTokenCount"]}")
         
         # Find a function call in any of the parts
         function_call = None
@@ -45,6 +55,8 @@ def call_gemini(prompt, history=None):
         if function_call:
             name = function_call['name']
             args = function_call['args']
+            
+            print(f"Agent calling: {name} with {args}")
             
             # Execute the tool
             result = TOOL_MAP[name](**args)
